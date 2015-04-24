@@ -28,4 +28,6 @@ char myAskToSaveFile(const char*);
 
 Int_t myGetBin(Double_t, Double_t*, Int_t);
 
+void myPrintEventYields(ostream &, const Double_t, const Int_t, const Double_t *);
+
 #endif

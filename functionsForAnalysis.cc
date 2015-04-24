@@ -210,3 +210,32 @@ Int_t myGetBin(Double_t x, Double_t *inputArray, Int_t nBins) {
   return correctBin;
  
 }
+
+
+void myPrintEventYields(ostream & myOutStream, const Double_t lumi, const Int_t cutSteps, const Double_t * eventsInStep) {
+
+  myOutStream<<"**************************"<<endl;
+  myOutStream<<"*        EVENT YIELDS        *"<<endl;
+  myOutStream<<"**************************"<<endl;
+  myOutStream<<"trigger cuts disabled"<<endl;
+  myOutStream<<"-----------------------------------------------------------------------------------"<<endl;  
+  //nwentries is the number of events taking all weights into account (cuts due to triggers were not taken into account)
+  myOutStream<<"nwentries:  weighted total number of entries = "<<eventsInStep[0]<<endl;
+  myOutStream<<"n:               number of events after i-th cut"<<endl;
+  myOutStream<<"aR:            absolute ratio = n(i)/n(1)"<<endl;
+  myOutStream<<"rR:             relative ratio = n(i)/n(i-1)"<<endl;
+  myOutStream<<"**************************"<<endl;
+  myOutStream<<"data normalised to "<<lumi<<" fb^-1"<<endl;
+  myOutStream<<setw(3)<<"cut"<<setw(12)<<"n"<<setw(12)<<"aR"<<setw(8)<<"rR"<<endl;
+  for (Int_t i = 1; i <= cutSteps; i++) {
+    if (i == 1) {	  
+      myOutStream<<setw(3)<<i<<setw(12)<<eventsInStep[i]<<fixed<<setprecision(4)<<setw(12)<<1.0<<setw(8)<<1.0<<endl;     
+    } else {
+      myOutStream<<setw(3)<<i<<setw(12)<<eventsInStep[i]<<fixed<<setprecision(4)<<setw(12)<<eventsInStep[i]/eventsInStep[1]<<
+	setw(8)<<eventsInStep[i]/eventsInStep[i-1]<<endl;  
+    }
+  }
+  myOutStream<<"--------------------------------------------------------"<<endl;
+  myOutStream<<endl;
+
+}
