@@ -1,4 +1,3 @@
-//I apply the selection done for the monojet analysis and I will compare with the results from Nadir. This time I will use weights when filling the histograms
 #define Analysis_cxx
 #include "Analysis.h"
 //C or C++ header files
@@ -81,6 +80,43 @@ using namespace std;
 Int_t cut::nCuts_ = 0;
 vector<cut*> cut::listOfCuts; 
 
+void cut::printCutFlow(ostream & myOutStream, const Int_t cutSteps, const UInt_t *singleCutMask) {
+
+  //this function prints the cut flow on the appropriate ofstream (can be a file or cout). Since it's a member function of class cut, it only needs to get the number of cut steps. For now it needs the array of masks which is not a class data member yet
+
+  myOutStream<<"**************************"<<endl;
+  myOutStream<<"*          CUTS FLOW          *"<<endl;
+  myOutStream<<"**************************"<<endl;
+  myOutStream<<"-----------------------------------------------------------------------------------"<<endl;  
+  myOutStream<<"Printing list of cuts applied at each step"<<endl;
+  for (Int_t i = 0; i < cutSteps; i++) {
+    myOutStream<<"-----------------------------------"<<endl;
+    myOutStream<<setw(2)<<(i+1)<<endl;
+    for (Int_t j = 0; j < cut::getNCuts(); j++) {
+      if ((singleCutMask[i] >> j) & 1) {
+	myOutStream<<"      ";
+	cut::listOfCuts[j]->print(myOutStream,1); 
+      }
+    }
+  }
+  myOutStream<<"-----------------------------------"<<endl;  
+
+}
+
+void cut::printActiveCuts(ostream & myOutStream) {
+
+  myOutStream<<"------------------------------------------------------------------------------------------"<<endl;
+  myOutStream<<"Printing list of activated cuts"<<endl;
+  myOutStream<<"------------------------------------------------------------------------------------------"<<endl;
+  for (Int_t i = 0; i < cut::getNCuts(); i++ ) {
+    if ( cut::listOfCuts[i]->isActive() ) {
+      cut::listOfCuts[i]->printAllInfo(myOutStream);
+    }
+  }
+  myOutStream<<"------------------------------------------------------------------------------------------"<<endl;
+
+}
+
 cut::cut(Bool_t flag, const char *cut_name, const char *var_name, const char *condition, const Double_t threshold, const string comment) {
   flag_ = flag;
   cut_ =cut_name;
@@ -138,19 +174,23 @@ cut::~cut() {
   nCuts_--;
 }
 
-void cut::printCut() const {
-  cout<<setw(18)<<left<<cut_<<": id = "<<setw(2)<<right<<id_<<" | "<<setw(18)<<left<<var_<<" "<<setw(2)<<cond_<<" ";
-  cout<<setw(4)<<right<<thr_<<"   "<<left<<comment_<<endl; 
+void cut::printAllInfo(ostream & myOutStream) const {
+
+  myOutStream<<setw(18)<<left<<cut_<<": id = "<<setw(2)<<right<<id_<<" | "<<setw(18)<<left<<var_<<" "<<setw(2)<<cond_<<" ";
+  myOutStream<<setw(4)<<right<<thr_<<"   "<<left<<comment_<<endl; 
+
  }
 
-void cut::print() const {
-  cout<<setw(18)<<left<<var_<<" "<<setw(2)<<cond_<<" "<<setw(4)<<right<<thr_<<endl; 
- }
+void cut::print(ostream & myOutStream = cout, Bool_t addComment = 0) const {
 
-void cut::printFile(ofstream &outfile) const {
-  outfile<<setw(18)<<left<<var_<<" "<<setw(2)<<cond_<<" "<<setw(4)<<right<<thr_<<"   "<<left<<comment_<<endl; 
- }
+  //print cut definition on the right ofstream (cout is default), if addComment = 1, cut  comment is printed if any
+  if (addComment) {
+    myOutStream<<setw(18)<<left<<var_<<" "<<setw(2)<<cond_<<" "<<setw(4)<<right<<thr_<<"   "<<left<<comment_<<endl; 
+  } else {
+    myOutStream<<setw(18)<<left<<var_<<" "<<setw(2)<<cond_<<" "<<setw(4)<<right<<thr_<<endl; 
+  }
 
+ }
 
 Bool_t cut::isPassed(Double_t input) {
 
@@ -166,6 +206,7 @@ Bool_t cut::isPassed(Double_t input) {
   }
 
 }
+
 
 //----------------------------------------------------------------------------------
 
@@ -346,16 +387,8 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      exit(EXIT_FAILURE);
    }
 
-   cout<<"------------------------------------------------------------------------------------------"<<endl;
-   cout<<"Printing activated cuts"<<endl;
-   cout<<"------------------------------------------------------------------------------------------"<<endl;
-   for (Int_t i = 0; i < cut::getNCuts(); i++ ) {
-     if ( cut::listOfCuts[i]->isActive() ) {
-       cut::listOfCuts[i]->printCut();
-       //cout<<"2^id = "<<cut::listOfCuts[i]->get2ToId()<<endl;   
-     }
-   }
-   cout<<"------------------------------------------------------------------------------------------"<<endl;
+   cut::printActiveCuts(cout);
+
    //building masks for our analysis. If a different cut flow is needed, changes must be done here
    UInt_t singleCutMask[NCUTS] = {};   //mask with cuts in a specific step
    singleCutMask[0] = mumet250C.get2ToId();
@@ -382,47 +415,18 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
    // singleCutMask[9] = mumet400C.get2ToId();
    // singleCutMask[10] = mumet500C.get2ToId();
 
-   cout<<"Printing list of cuts applied at each step"<<endl;
-   //loop on the number of masks
-   for (Int_t i = 0; i < NCUTS; i++) {
-     cout<<"-----------------------------------"<<endl;
-      cout<<setw(2)<<(i+1)<<endl;
-      //loop on the number of bits of masks (only those bits whose corresponding cuts are enabled)
-      for (Int_t j = 0; j < cut::getNCuts(); j++) {
-	 if ((singleCutMask[i] >> j) & 1) {
-	   cout<<"      ";
-	    cut::listOfCuts[j]->print(); // cout<<setw(22)<<cut::listOfCuts[j]->getCutDefinition()<<endl; 
-	 }
-      }
-   }
-   cout<<"-----------------------------------"<<endl;  
+   cut::printCutFlow(cout,NCUTS,singleCutMask);
 
    UInt_t globalCutMask[NCUTS] ;   //mask adding to a specific step all previous cuts 
    for (Int_t i = 0; i < NCUTS; i++ ) {
      globalCutMask[i] = 0.0;
    }
-   globalCutMask[0] = singleCutMask[0];   //the following loop' s aim is to have incapsulated conditions (globalMask of step i-th must include all previous steps)
-   // cout<<endl;
-   // cout<<"globalCutMask[0] = "<<globalCutMask[0]<<endl;   
+   //the following loop' s aim is to have incapsulated conditions (globalMask of step i-th must include all previous steps)  
    for (Int_t i = 1; i < NCUTS; i++) {
-     globalCutMask[i] = singleCutMask[i] + globalCutMask[i-1];
-     // cout<<"globalCutMask["<<i<<"] = "<<globalCutMask[i]<<endl; 
+     if (i == 0) globalCutMask[0] = singleCutMask[0];
+     else globalCutMask[i] = singleCutMask[i] + globalCutMask[i-1];
    }
    cout<<endl;
-   // cout<<"Printing list of cuts applied at each step (globalCutMask)"<<endl;
-   // //loop on the number of masks
-   // for (Int_t i = 0; i < NCUTS; i++) {
-   //   cout<<"-----------------------------------"<<endl;
-   //    cout<<setw(2)<<(i+1)<<endl;
-   //    //loop on the number of bits of masks (only those bits whose corresponding cuts are enabled)
-   //    for (Int_t j = 0; j < cut::getNCuts(); j++) {
-   // 	 if ((globalCutMask[i] >> j) & 1) {
-   // 	   cout<<"      ";
-   // 	    cut::listOfCuts[j]->print(); // cout<<setw(22)<<cut::listOfCuts[j]->getCutDefinition()<<endl; 
-   // 	 }
-   //    }
-   // }
-   // cout<<"-----------------------------------"<<endl;  
 
    Double_t nWeightedEvents[NCUTS+1];  // number of weighted events (it's a Double_t because weights are non-integer numbers)
    for (Int_t i = 0; i <= NCUTS; i++ ) {
@@ -517,7 +521,7 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      HmumetOrtZvsZpt[i] = new TH1D(Form("HmumetOrtZvsZpt[%i]",i),"",250,200,700); 
      HmumetParZvsZpt[i] = new TH1D(Form("HmumetParZvsZpt[%i]",i),"",250,200,700); 
    }
-   
+
    Double_t nev1j=0, nev2j=0, nev3j=0;                                           //# of events with 1,2,3 jets
    Double_t nev1jmore30=0, nev2jmore30=0, nev3jmore30=0;        //# of events with jet 1,2,3 with pt >30 GeV 
    Double_t nevj1pteq0=0, nevj2pteq0=0, nevj3pteq0=0;                 //# of events with jet 1,2,3 with pt = 30 GeV 
@@ -579,8 +583,8 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      if (wzpt > 250) {   //this corresponds to trigger efficiency plateaux (actually it would be mumet, but mumet recoils against wzpt so their pt should be of the same order of magnitude). In any case, note that in our tree is always mumet > 200 
 
        Int_t nvtxBin = nvtx-FIRST_NVTX;
-       Int_t lastnvtx = NVTXS + FIRST_NVTX;
-       if ((nvtxBin >= 0) && (nvtx < lastnvtx)) {
+  
+       if ((nvtxBin >= 0) && (nvtx < (NVTXS + FIRST_NVTX))) {
 
 	 if (wzpt < 500) {                        // (met||-wzpt) distribution's width depends on pt, thus I use this range
 	   HmumetParZvsNvtx[nvtxBin]->Fill(mumetPar-wzpt,newwgt);
@@ -777,29 +781,7 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      cout<<"cut "<<setw(2)<<i<<" : nWeightedEvents = "<<nWeightedEvents[i]<<"     Hjet1pt->GetSumOfWeights = "<<Hjet1pt[i]->GetSumOfWeights()<<endl;
    }
    cout<<endl;   
-   cout<<"ALL FOLLOWING NUMBERS ARE NORMALIZED TO "<<LUMI<<" FB^-1"<<endl;
-   cout<<"**************************"<<endl;
-   cout<<"*        CUTS FLOW        *"<<endl;
-   cout<<"**************************"<<endl;
-   cout<<"trigger cuts disabled"<<endl;
-   cout<<"-----------------------------------------------------------------------------------"<<endl;  
-//nwentries is the number of events taking all weights into account (cuts due to triggers were not taken into account)
-   cout<<"nwentries:  weighted total number of entries = "<<nwentries<<endl;
-   cout<<"n:               number of events after i-th cut"<<endl;
-   cout<<"aR:            absolute ratio = n(i)/n(1)"<<endl;
-   cout<<"rR:             relative ratio = n(i)/n(i-1)"<<endl;
-   cout<<"**************************"<<endl;
-   cout<<"data normalised to "<<LUMI<<" fb^-1"<<endl;
-   cout<<setw(3)<<"cut"<<setw(12)<<"n"<<setw(12)<<"aR"<<setw(8)<<"rR"<<endl;
-   for (Int_t i = 1; i <= NCUTS; i++) {
-     if (i == 1) {	  
-       cout<<setw(3)<<i<<setw(12)<<nWeightedEvents[i]<<fixed<<setprecision(4)<<setw(12)<<1.0<<setw(8)<<1.0<<endl;     
-     } else {
-       cout<<setw(3)<<i<<setw(12)<<nWeightedEvents[i]<<fixed<<setprecision(4)<<setw(12)<<nWeightedEvents[i]/nwentriesCut1<<
-	 setw(8)<<nWeightedEvents[i]/nWeightedEvents[i-1]<<endl;  
-     }
-   }
-   cout<<"--------------------------------------------------------"<<endl;
+   myPrintEventYields(cout,LUMI,NCUTS,nWeightedEvents);
    cout<<"Following numbers concerning jets refers to jets with pt>30 GeV"<<endl;
    cout<<setw(25)<<left<<"event type"<<"fraction"<<endl;
    cout<<setprecision(4)<<setw(25)<<left<<"exactly 1 jet "<<nev1j/nwentries<<endl;
@@ -822,21 +804,8 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
    cout<<"-----------------------------------------------------------------------------------"<<endl;  
    cout<<endl;  
 
-
-   // cout<<"LUMI*HtestNevents->GetSumOfWeights() = "<<LUMI*HtestNevents->GetSumOfWeights()<<endl;
-   // cout<<"LUMI*HtestNeventsBis->GetSumOfWeights() = "<<LUMI*HtestNeventsBis->GetSumOfWeights()<<endl;
-   // HtestNevents->Scale(LUMI);
-   // HtestNeventsBis->Scale(LUMI);
-   // cout<<"Now rescaling histograms using histo->Scale("<<LUMI<<")"<<endl;
-   // cout<<"HtestNevents->Integral() = "<<HtestNevents->Integral()<<endl;
-   // cout<<"HtestNeventsBis->Integral() = "<<HtestNeventsBis->Integral()<<endl;
-   // cout<<endl;
-   // cout<<"Hjet2ptallCMet500->GetSumOfWeights() = "<<Hjet2ptallCMet500->GetSumOfWeights()<<endl;
-   // cout<<"Hjet2etaallCMet500->GetSumOfWeights() = "<<Hjet2etaallCMet500->GetSumOfWeights()<<endl;
-   // cout<<endl;
-
   //------------------------------------------------
-   // begin of file
+   // beginning of file
   //------------------------------------------------
 
    //the following file is to record the last sequence of cuts used 
@@ -847,43 +816,9 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      } else {
        cout<<"Saving latest results of cut based analysis in file lastCuts.txt ..."<<endl;
        //when writing on file, the date is printed as well unless an error occurs
-       if ( system("date>>lastCuts.txt") !=0) cout<<"Error during \"system(\"date>>lastCuts.txt\")\" call"<<endl;  
-       recoFile<<"ALL FOLLOWING NUMBERS ARE NORMALIZED TO "<<LUMI<<" FB^-1"<<endl;
-       recoFile<<"**************************"<<endl;
-       recoFile<<"*          CUTS FLOW          *"<<endl;
-       recoFile<<"**************************"<<endl;
-       recoFile<<"-----------------------------------------------------------------------------------"<<endl;  
-       recoFile<<"Printing list of cuts applied at each step"<<endl;
-       for (Int_t i = 0; i < NCUTS; i++) {
-	 recoFile<<"-----------------------------------"<<endl;
-	 recoFile<<setw(2)<<(i+1)<<endl;
-	 for (Int_t j = 0; j < cut::getNCuts(); j++) {
-	   if ((singleCutMask[i] >> j) & 1) {
-	     recoFile<<"      ";
-	     cut::listOfCuts[j]->printFile(recoFile); 
-	   }
-	 }
-       }
-       recoFile<<"-----------------------------------"<<endl;  
-       recoFile<<"trigger cuts disabled"<<endl;    
-       //nwentries is the number of events taking all weights into account (cuts due to triggers were not taken into account)
-       recoFile<<"nwentries:  weighted total number of entries = "<<nwentries<<endl;
-       recoFile<<"n:               number of events after i-th cut"<<endl;
-       recoFile<<"aR:            absolute ratio = n(i)/n(1)"<<endl;
-       recoFile<<"rR:             relative ratio = n(i)/n(i-1)"<<endl;
-       recoFile<<"**************************"<<endl;
-       recoFile<<"data normalised to "<<LUMI<<" fb^-1"<<endl;
-       recoFile<<setw(3)<<right<<"cut"<<setw(12)<<"n"<<setw(12)<<"aR"<<setw(8)<<"rR"<<endl;
-       for (Int_t i = 1; i <= NCUTS; i++) {
-	 if (i == 1) {	  
-	   recoFile<<setw(3)<<i<<setw(12)<<nWeightedEvents[i]<<fixed<<setprecision(4)<<setw(12)<<1.0<<setw(8)<<1.0<<endl;     
-	 } else {
-	   recoFile<<setw(3)<<i<<setw(12)<<nWeightedEvents[i]<<fixed<<setprecision(4)<<setw(12)<<nWeightedEvents[i]/nWeightedEvents[1]<<
-	     setw(8)<<nWeightedEvents[i]/nWeightedEvents[i-1]<<endl;  
-	 }
-       }
-       recoFile<<"-----------------------------------------------------------------------------------"<<endl;  
-       recoFile<<endl;
+       if ( system("date>>lastCuts.txt") != 0) cout<<"Error during \"system(\"date>>lastCuts.txt\")\" call"<<endl;   
+       cut::printCutFlow(recoFile, NCUTS, singleCutMask);
+       myPrintEventYields(recoFile,LUMI,NCUTS,nWeightedEvents);
        recoFile.close();
      } 
 
@@ -895,69 +830,19 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
    if (answer == 'y') {
 
      ofstream myfile(filename,ios::app);
+
      if ( !myfile.is_open() ) {
        cout<<"Error: unable to open file "<<filename<<" !"<<endl;
+
      } else {
        //when writing on file, the date is printed as well unless an error occurs
-       if ( system("date>>cutFlowData.txt") !=0) cout<<"Error during \"system(\"date>>cutFlowData.txt\")\" call"<<endl;  
-       myfile<<"ALL FOLLOWING NUMBERS ARE NORMALIZED TO "<<LUMI<<" FB^-1"<<endl;
-       myfile<<"**************************"<<endl;
-       myfile<<"*          CUTS FLOW          *"<<endl;
-       myfile<<"**************************"<<endl;
-       myfile<<"-----------------------------------------------------------------------------------"<<endl;  
-       myfile<<"Printing list of cuts applied at each step"<<endl;
-       for (Int_t i = 0; i < NCUTS; i++) {
-	 myfile<<"-----------------------------------"<<endl;
-	 myfile<<setw(2)<<(i+1)<<endl;
-	 for (Int_t j = 0; j < cut::getNCuts(); j++) {
-	   if ((singleCutMask[i] >> j) & 1) {
-	     myfile<<"      ";
-	     cut::listOfCuts[j]->printFile(myfile); // cout<<setw(22)<<cut::listOfCuts[j]->getCutDefinition()<<endl; 
-	   }
-	 }
-       }
-       myfile<<"-----------------------------------"<<endl;  
-       myfile<<"trigger cuts disabled"<<endl;    
-       //nwentries is the number of events taking all weights into account (cuts due to triggers were not taken into account)
-       myfile<<"nwentries:  weighted total number of entries = "<<nwentries<<endl;
-       myfile<<"n:               number of events after i-th cut"<<endl;
-       myfile<<"aR:            absolute ratio = n(i)/n(1)"<<endl;
-       myfile<<"rR:             relative ratio = n(i)/n(i-1)"<<endl;
-       myfile<<"**************************"<<endl;
-       myfile<<"data normalised to "<<LUMI<<" fb^-1"<<endl;
-       myfile<<setw(3)<<"cut"<<setw(12)<<"n"<<setw(12)<<"aR"<<setw(8)<<"rR"<<endl;
-       for (Int_t i = 1; i <= NCUTS; i++) {
-	 if (i == 1) {	  
-	   myfile<<setw(3)<<i<<setw(12)<<nWeightedEvents[i]<<fixed<<setprecision(4)<<setw(12)<<1.0<<setw(8)<<1.0<<endl;     
-	 } else {
-	   myfile<<setw(3)<<i<<setw(12)<<nWeightedEvents[i]<<fixed<<setprecision(4)<<setw(12)<<nWeightedEvents[i]/nWeightedEvents[1]<<
-	     setw(8)<<nWeightedEvents[i]/nWeightedEvents[i-1]<<endl;  
-	 }
-       }
-       // myfile<<"--------------------------------------------------------"<<endl;
-       // myfile<<"Following numbers concerning jets refers to jets with pt>30 GeV"<<endl;
-       // myfile<<setw(25)<<left<<"event type"<<"fraction"<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"exactly 1 jet "<<nev1j/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"exactly 2 jets "<<nev2j/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"exactly 3 jets "<<nev3j/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"more than 1 jet "<<nevmore1j/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"more than 2 jet "<<nevmore2j/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"more than 3 jet "<<nevmore3j/nwentries<<endl;
-       // myfile<<"--------------------------------------------------------"<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"signaljetpt>30GeV "<<nev1jmore30/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"secondjetpt>30GeV "<<nev2jmore30/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"thirdjetpt>30GeV "<<nev3jmore30/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"signaljetpt = 0 "<<nevj1pteq0/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"secondjetpt = 0 "<<nevj2pteq0/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"thirdjetpt = 0 "<<nevj3pteq0/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"signaljetpt != 0 "<<nevj1ptneq0/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"secondjetpt != 0 "<<nevj2ptneq0/nwentries<<endl;
-       // myfile<<setprecision(4)<<setw(25)<<left<<"thirdjetpt != 0 "<<nevj3ptneq0/nwentries<<endl;
-       // myfile<<"--------------------------------------------------------"<<endl;
-       myfile<<"-----------------------------------------------------------------------------------"<<endl;  
-       myfile<<endl;
+       if ( system("date>>cutFlowData.txt") != 0) cout<<"Error during \"system(\"date>>cutFlowData.txt\")\" call"<<endl;  
+       cut::printCutFlow(myfile, NCUTS, singleCutMask);
+       myPrintEventYields(myfile,LUMI,NCUTS,nWeightedEvents);
        myfile.close();
-     } 
+
+     }
+ 
    }
    //------------------------------------------------
    //end of file
@@ -1016,6 +901,49 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      }
 
    }
+
+   //saving histograms on file .root
+   TFile *rootFile = TFile::Open("histograms.root","RECREATE");
+
+   for (Int_t i = 0; i <= NCUTS; i++) {
+     Hjet1pt[i]->Write();
+   }
+
+   Hjet1etanoC->Write();
+   Hjet1etaallCMet250->Write();
+   Hjet1etaallCMet500->Write();
+   Hjet2ptnoC->Write();
+   Hjet2ptallCMet250->Write();
+   Hjet2ptallCMet300->Write();
+   Hjet2ptallCMet400->Write();
+   Hjet2ptallCMet500->Write();
+   Hjet2etanoC->Write();
+   Hjet2etaallCMet250->Write();
+   Hjet2etaallCMet500->Write();
+   Hjet1jet2dphinoC->Write();
+   Hjet1jet2dphiallCMet250->Write();
+   Hjet1jet2dphiallCMet500->Write();
+   HnjetsnoC->Write();
+   HnjetsallCMet250->Write(); 
+   HnjetsallCMet500->Write();
+   HmumetnoC->Write();
+   HmumetallCMet250->Write(); 
+
+   for (Int_t i = 0; i < NVTXS; i++) {
+     HmumetOrtZvsNvtx[i]->Write(); 
+     HmumetParZvsNvtx[i]->Write(); 
+     HmumetX[i]->Write(); 
+     HmumetY[i]->Write();  
+   }
+
+   for (Int_t i = 0;  i < nBinsForResponse; i++) {
+     HZptBinned[i]->Write(); 
+     HmumetParZratio[i]->Write(); 
+     HmumetOrtZvsZpt[i]->Write(); 
+     HmumetParZvsZpt[i]->Write(); 
+   }
+
+   rootFile->Close();
 
    /*
 GetEffectiveEntries() returns ((Sum w)^2)/(Sum(w^2)) where w means weight and Sum is the sum over the arguments. This number is the number of events that would be needed by an unweighted histogram to have the same statistical power as the weighted one
