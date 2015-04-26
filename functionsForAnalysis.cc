@@ -4,6 +4,7 @@
 #include <TF1.h>
 #include <cstdlib> //as stdlib.h
 #include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <iomanip> //for input/output manipulators
@@ -13,15 +14,9 @@
 
 using namespace std;
 
-void myDashes() {
+void myDashes(ostream &myOutStream = cout) {
 
-    cout<<"-----------------------------------------------------------------------------------"<<endl; 
-    //cout<<"adding this line"<<endl;
-}
-
-void myDashesInFile(ofstream &file) {
-
-    file<<"-----------------------------------------------------------------------------------"<<endl; 
+    myOutStream<<"-----------------------------------------------------------------------------------"<<endl; 
 
 }
 
@@ -59,9 +54,10 @@ Double_t myGetPhi(const Double_t x_component, const Double_t y_component) {
 
 }
 
-//this function put the overflows in the last bin of an histogram
 void myFillOverflowBin(TH1D *histo, const Double_t value) {
   
+  //this function put the overflows in the last bin of an histogram
+
   TAxis *axis = 0;
   axis = histo->GetXaxis();
   if(value>(axis->GetBinUpEdge(axis->GetLast()))) {
@@ -73,14 +69,230 @@ void myFillOverflowBin(TH1D *histo, const Double_t value) {
 }
 
 void myFillOverflowBinW(TH1D *histo, const Double_t value, const Double_t weight) {
-  
+
+  // filling last bin with overflow for histograms with weights
+
   TAxis *axis = 0;
   axis = histo->GetXaxis();
-  if(value>(axis->GetBinUpEdge(axis->GetLast()))) {
+  if(value > (axis->GetBinUpEdge(axis->GetLast()))) {
     histo->Fill(axis->GetBinCenter(axis->GetLast()),weight);
   } else {
     histo->Fill(value, weight);
   }
+
+}
+
+void myDrawOverflow(const TH1D *oldHisto, const char* myOptions) {
+
+  // this function create a new histogram with one more bin than oldHisto. This additional bin will contain the overflow of oldHisto. 
+  // The width of this additional bin is set equal to the width of the last bin of oldHisto. This is not relevant for histograms where the
+  // width is always the same for each bin, but care should be taken for histograms whose bin's width depends on the bit
+  // By definition, the overflow bin of newHisto is empty
+  // The strategy is creating a temporary array htemp which, before being deleted (since it's created with "new" it' better to delete it at the end
+  // of the function), will be copied into newHisto
+
+  TH1::SetDefaultSumw2();            // all the following histograms will automatically call TH1::Sumw2() 
+  TH1::StatOverflows();                 // enable use of underflows and overflows for statistics computation 
+
+  TAxis *axis = 0;
+  axis = oldHisto->GetXaxis();
+  Double_t overflowBinWidth = axis->GetBinWidth(axis->GetLast());
+  Double_t newUpperEdge = axis->GetBinUpEdge(axis->GetLast()) + overflowBinWidth;
+  Double_t newLowerEdge = axis->GetBinLowEdge(axis->GetFirst());
+  Int_t newNBins = oldHisto->GetNbinsX() + 1;   //  +1 because I want to add an additional bin for the overflow
+
+  // some checks to keep things under control 
+  // cout<<"inside myOverflowInLastBin()"<<endl;
+  // cout<<"newNBins = "<<newNBins<<endl;
+  // cout<<"newUpperEdge = "<<newUpperEdge<<endl;
+  // cout<<"oldHisto->GetBinContent(newNBins) = "<<oldHisto->GetBinContent(newNBins)<<endl;
+
+  TH1D *htemp = new TH1D("htemp","",newNBins,newLowerEdge,newUpperEdge);
+
+  // setting bin content and error
+  for (Int_t i = 1; i <= newNBins; i++) {
+    htemp->SetBinContent(i,oldHisto->GetBinContent(i));
+    htemp->SetBinError(i,oldHisto->GetBinError(i));
+  }
+  // filling underflow bin 
+  htemp->SetBinContent(0,oldHisto->GetBinContent(0));
+  htemp->SetBinError(0,oldHisto->GetBinError(0));
+  // setting line color and axis titles
+  htemp->GetXaxis()->SetTitle(oldHisto->GetXaxis()->GetTitle());
+  htemp->GetYaxis()->SetTitle(oldHisto->GetYaxis()->GetTitle());
+  htemp->SetLineColor(oldHisto->GetLineColor());
+  htemp->SetFillColor(oldHisto->GetFillColor());
+  // setting number of entries to effective entries (same as entries for unweighted histograms) + content 
+  // of overflow bin (which is not included by Get(Effective)Entries())
+  htemp->SetEntries(oldHisto->GetBinContent(newNBins) + oldHisto->GetEffectiveEntries());
+
+  htemp->Draw(myOptions);
+
+}
+
+void myDrawOverflow(const TH1D *oldHisto, const char* myOptions, const Int_t mySetStats = 1) {
+
+  // this function create a new histogram with one more bin than oldHisto. This additional bin will contain the overflow of oldHisto. 
+  // The width of this additional bin is set equal to the width of the last bin of oldHisto. This is not relevant for histograms where the
+  // width is always the same for each bin, but care should be taken for histograms whose bin's width depends on the bit
+  // By definition, the overflow bin of newHisto is empty
+  // The strategy is creating a temporary array htemp which, before being deleted (since it's created with "new" it' better to delete it at the end
+  // of the function), will be copied into newHisto
+
+  TH1::SetDefaultSumw2();            // all the following histograms will automatically call TH1::Sumw2() 
+  TH1::StatOverflows();                 // enable use of underflows and overflows for statistics computation 
+
+  TAxis *axis = 0;
+  axis = oldHisto->GetXaxis();
+  Double_t overflowBinWidth = axis->GetBinWidth(axis->GetLast());
+  Double_t newUpperEdge = axis->GetBinUpEdge(axis->GetLast()) + overflowBinWidth;
+  Double_t newLowerEdge = axis->GetBinLowEdge(axis->GetFirst());
+  Int_t newNBins = oldHisto->GetNbinsX() + 1;   //  +1 because I want to add an additional bin for the overflow
+
+  // some checks to keep things under control 
+  // cout<<"inside myOverflowInLastBin()"<<endl;
+  // cout<<"newNBins = "<<newNBins<<endl;
+  // cout<<"newUpperEdge = "<<newUpperEdge<<endl;
+  // cout<<"oldHisto->GetBinContent(newNBins) = "<<oldHisto->GetBinContent(newNBins)<<endl;
+
+  TH1D *htemp = new TH1D("htemp","",newNBins,newLowerEdge,newUpperEdge);
+  // TH1D histo("histo","",newNBins,newLowerEdge,newUpperEdge);
+  // TH1D *htemp = &histo;
+
+  // setting bin content and error
+  for (Int_t i = 1; i <= newNBins; i++) {
+    htemp->SetBinContent(i,oldHisto->GetBinContent(i));
+    htemp->SetBinError(i,oldHisto->GetBinError(i));
+  }
+  // filling underflow bin 
+  htemp->SetBinContent(0,oldHisto->GetBinContent(0));
+  htemp->SetBinError(0,oldHisto->GetBinError(0));
+  // setting line color and axis titles
+  htemp->GetXaxis()->SetTitle(oldHisto->GetXaxis()->GetTitle());
+  htemp->GetYaxis()->SetTitle(oldHisto->GetYaxis()->GetTitle());
+  htemp->SetLineColor(oldHisto->GetLineColor());
+  htemp->SetFillColor(oldHisto->GetFillColor());
+  // setting number of entries to effective entries (same as entries for unweighted histograms) + content 
+  // of overflow bin (which is not included by Get(Effective)Entries())
+  htemp->SetEntries(oldHisto->GetBinContent(newNBins) + oldHisto->GetEffectiveEntries());
+
+  if( !mySetStats ) htemp->SetStats(kFALSE);
+  htemp->Draw(myOptions);
+
+}
+
+TH1D *myOverflowInLastBin(const TH1D *oldHisto) {
+
+  // this function create a new histogram with one more bin than oldHisto. This additional bin will contain the overflow of oldHisto. 
+  // The width of this additional bin is set equal to the width of the last bin of oldHisto. This is not relevant for histograms where the
+  // width is always the same for each bin, but care should be taken for histograms whose bin's width depends on the bit
+  // By definition, the overflow bin of newHisto is empty
+  // The strategy is creating a temporary array htemp which, before being deleted (since it's created with "new" it' better to delete it at the end
+  // of the function), will be copied into newHisto
+
+  TH1::SetDefaultSumw2();            // all the following histograms will automatically call TH1::Sumw2() 
+  TH1::StatOverflows();                 // enable use of underflows and overflows for statistics computation 
+
+  TAxis *axis = 0;
+  axis = oldHisto->GetXaxis();
+  Double_t overflowBinWidth = axis->GetBinWidth(axis->GetLast());
+  Double_t newUpperEdge = axis->GetBinUpEdge(axis->GetLast()) + overflowBinWidth;
+  Double_t newLowerEdge = axis->GetBinLowEdge(axis->GetFirst());
+  Int_t newNBins = oldHisto->GetNbinsX() + 1;   //  +1 because I want to add an additional bin for the overflow
+
+  // some checks to keep things under control 
+  // cout<<"inside myOverflowInLastBin()"<<endl;
+  // cout<<"newNBins = "<<newNBins<<endl;
+  // cout<<"newUpperEdge = "<<newUpperEdge<<endl;
+  // cout<<"oldHisto->GetBinContent(newNBins) = "<<oldHisto->GetBinContent(newNBins)<<endl;
+
+  static TH1D *htemp1 = new TH1D("htemp1","",newNBins,newLowerEdge,newUpperEdge);
+
+  // setting bin content and error
+  for (Int_t i = 1; i <= newNBins; i++) {
+    htemp1->SetBinContent(i,oldHisto->GetBinContent(i));
+    htemp1->SetBinError(i,oldHisto->GetBinError(i));
+  }
+  // filling underflow bin 
+  htemp1->SetBinContent(0,oldHisto->GetBinContent(0));
+  htemp1->SetBinError(0,oldHisto->GetBinError(0));
+  // setting line color and axis titles
+  htemp1->GetXaxis()->SetTitle(oldHisto->GetXaxis()->GetTitle());
+  htemp1->GetYaxis()->SetTitle(oldHisto->GetYaxis()->GetTitle());
+  htemp1->SetLineColor(oldHisto->GetLineColor());
+  htemp1->SetFillColor(oldHisto->GetFillColor());
+  // setting number of entries to effective entries (same as entries for unweighted histograms) + content 
+  // of overflow bin (which is not included by Get(Effective)Entries())
+  htemp1->SetEntries(oldHisto->GetBinContent(newNBins) + oldHisto->GetEffectiveEntries());
+
+  return htemp1;
+
+}
+
+void myOverflowInLastBin2(TH1D *newHisto, const TH1D *oldHisto) {
+
+  // this function, when called with a histo defined as "TH1D *histo = 0" as newHisto, produces segmentation fault!!!
+
+  // this function create a new histogram with one more bin than oldHisto. This additional bin will contain the overflow of oldHisto. 
+  // The width of this additional bin is set equal to the width of the last bin of oldHisto. This is not relevant for histograms where the
+  // width is always the same for each bin, but care should be taken for histograms whose bin's width depends on the bit
+  // By definition, the overflow bin of newHisto is empty
+  // The strategy is creating a temporary array htemp which, before being deleted (since it's created with "new" it' better to delete it at the end
+  // of the function), will be copied into newHisto
+
+  TH1::SetDefaultSumw2();            // all the following histograms will automatically call TH1::Sumw2() 
+  TH1::StatOverflows();                 // enable use of underflows and overflows for statistics computation 
+
+  TAxis *axis = 0;
+  axis = oldHisto->GetXaxis();
+  Double_t overflowBinWidth = axis->GetBinWidth(axis->GetLast());
+  Double_t newUpperEdge = axis->GetBinUpEdge(axis->GetLast()) + overflowBinWidth;
+  Double_t newLowerEdge = axis->GetBinLowEdge(axis->GetFirst());
+  Int_t newNBins = oldHisto->GetNbinsX() + 1;   //  +1 because I want to add an additional bin for the overflow
+
+  // some checks to keep things under control 
+  // cout<<"inside myOverflowInLastBin()"<<endl;
+  // cout<<"newNBins = "<<newNBins<<endl;
+  // cout<<"newUpperEdge = "<<newUpperEdge<<endl;
+  // cout<<"oldHisto->GetBinContent(newNBins) = "<<oldHisto->GetBinContent(newNBins)<<endl;
+
+  TH1D htemp2("htemp2","",newNBins,newLowerEdge,newUpperEdge);
+
+  // setting bin content and error
+  for (Int_t i = 1; i <= newNBins; i++) {
+    htemp2.SetBinContent(i,oldHisto->GetBinContent(i));
+    htemp2.SetBinError(i,oldHisto->GetBinError(i));
+  }
+  // filling underflow bin 
+  htemp2.SetBinContent(0,oldHisto->GetBinContent(0));
+  htemp2.SetBinError(0,oldHisto->GetBinError(0));
+  // setting line color and axis titles
+  htemp2.GetXaxis()->SetTitle(oldHisto->GetXaxis()->GetTitle());
+  htemp2.GetYaxis()->SetTitle(oldHisto->GetYaxis()->GetTitle());
+  htemp2.SetLineColor(oldHisto->GetLineColor());
+  htemp2.SetFillColor(oldHisto->GetFillColor());
+  // setting number of entries to effective entries (same as entries for unweighted histograms) + content 
+  // of overflow bin (which is not included by Get(Effective)Entries())
+  htemp2.SetEntries(oldHisto->GetBinContent(newNBins) + oldHisto->GetEffectiveEntries());
+
+  *newHisto = htemp2;
+
+}
+
+void myAddOverflowInLastBin(TH1D *h) {
+
+  // to avoid problems regarding memory leak for not deleting htemp in previous function, I sum directly the content of overflow bin in last bin
+
+  Int_t lastBinNumber = h->GetNbinsX();
+  Int_t overflowBinNumber = 1 + lastBinNumber;
+  Double_t lastBinContent = h->GetBinContent(lastBinNumber);
+  Double_t overflowBinContent = h->GetBinContent(overflowBinNumber);
+  Double_t lastBinError = h->GetBinError(lastBinNumber);
+  Double_t overflowBinError = h->GetBinError(overflowBinNumber);
+
+  // add content of overflow bin in last bin and set error as square root of sum of error squares (with the assumption that they are uncorrelated)
+  h->SetBinContent(lastBinNumber, lastBinContent + overflowBinContent);
+  h->SetBinError(lastBinNumber, sqrt(lastBinError * lastBinError + overflowBinError * overflowBinError));
 
 }
 
@@ -112,7 +324,6 @@ Double_t myCrystalBall(double* x, double* par) {
   }
 
 }
-
 
 Double_t my2sideCrystalBall(double* x, double* par) {
 
@@ -147,6 +358,37 @@ Double_t my2sideCrystalBall(double* x, double* par) {
     Double_t BR = nR*invAbsAlphaR - absAlphaR;
     return N*AR*TMath::Power(BR+t,-nR);
   }
+
+}
+
+Double_t myResolutionFunction(double* x, double* par) {
+
+  // resolution function dE/E is given by the sum in quadrature of 3 terms: a / sqrt(E) ; b / E ; c
+  // thus, sigma(E) is obtained by multiplying dE / E by E  -->  sigma(E) = a*sqrt(E) + b + c*E where + is the sum in quadrature
+  // a, b and c are the stochastic, noise and constant term respectively
+
+  Double_t E = x[0];      // energy, pT or whatever
+  Double_t a = par[0];
+  Double_t b = par[1];
+  Double_t c = par[2];
+
+  return sqrt( a*a * E + b*b + c*c * E*E );
+
+}
+
+Double_t myResolutionFunctionNoB(double* x, double* par) {
+
+  // resolution function dE/E is given by the sum in quadrature of 3 terms: a / sqrt(E) ; b / E ; c
+  // thus, sigma(E) is obtained by multiplying dE / E by E  -->  sigma(E) = a*sqrt(E) + b + c*E where + is the sum in quadrature
+  // a, b and c are the stochastic, noise and constant term respectively
+
+  // the term with b could be neglected at big values of E
+
+  Double_t E = x[0];      // energy, pT or whatever
+  Double_t a = par[0];
+  Double_t c = par[1];
+
+  return sqrt( a*a * E + c*c * E*E );
 
 }
 
