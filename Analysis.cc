@@ -518,8 +518,8 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
      // the mean wzpt in each bin will be computed as the histogram's mean
      HZptBinned[i] = new TH1D(Form("HZptBinned[%i]",i),"",5,ZptBinEdges[i],ZptBinEdges[i+1]); 
      HmumetParZratio[i] = new TH1D(Form("HmumetParZratio[%i]",i),"",100,0.0,2.0); 
-     HmumetOrtZvsZpt[i] = new TH1D(Form("HmumetOrtZvsZpt[%i]",i),"",250,200,700); 
-     HmumetParZvsZpt[i] = new TH1D(Form("HmumetParZvsZpt[%i]",i),"",250,200,700); 
+     HmumetOrtZvsZpt[i] = new TH1D(Form("HmumetOrtZvsZpt[%i]",i),"",80,-200,200); 
+     HmumetParZvsZpt[i] = new TH1D(Form("HmumetParZvsZpt[%i]",i),"",80,-200,200); 
    }
 
    Double_t nev1j=0, nev2j=0, nev3j=0;                                           //# of events with 1,2,3 jets
@@ -903,47 +903,59 @@ The following is the list of variables, reflecting in the bits numbering (if Mas
    }
 
    //saving histograms on file .root
-   TFile *rootFile = TFile::Open("histograms.root","RECREATE");
+   const char *rootFileName = "histograms.root";
+   cout<<"Saving histograms in file \""<<rootFileName<<"\" ..."<<endl;
+   TFile *rootFile = new TFile(rootFileName,"RECREATE");
 
-   for (Int_t i = 0; i <= NCUTS; i++) {
-     Hjet1pt[i]->Write();
+   if (!rootFile->IsOpen()) {
+
+     cout<<"Error: file \""<<rootFileName<<"\" was not opened."<<endl;
+
+   } else {
+
+     for (Int_t i = 0; i <= NCUTS; i++) {
+       Hjet1pt[i]->Write();
+     }
+
+     Hjet1etanoC->Write();
+     Hjet1etaallCMet250->Write();
+     Hjet1etaallCMet500->Write();
+     Hjet2ptnoC->Write();
+     Hjet2ptallCMet250->Write();
+     Hjet2ptallCMet300->Write();
+     Hjet2ptallCMet400->Write();
+     Hjet2ptallCMet500->Write();
+     Hjet2etanoC->Write();
+     Hjet2etaallCMet250->Write();
+     Hjet2etaallCMet500->Write();
+     Hjet1jet2dphinoC->Write();
+     Hjet1jet2dphiallCMet250->Write();
+     Hjet1jet2dphiallCMet500->Write();
+     HnjetsnoC->Write();
+     HnjetsallCMet250->Write(); 
+     HnjetsallCMet500->Write();
+     HmumetnoC->Write();
+     HmumetallCMet250->Write(); 
+
+     for (Int_t i = 0; i < NVTXS; i++) {
+       HmumetOrtZvsNvtx[i]->Write(); 
+       HmumetParZvsNvtx[i]->Write(); 
+       HmumetX[i]->Write(); 
+       HmumetY[i]->Write();  
+     }
+
+     for (Int_t i = 0;  i < nBinsForResponse; i++) {
+       HZptBinned[i]->Write(); 
+       HmumetParZratio[i]->Write(); 
+       HmumetOrtZvsZpt[i]->Write(); 
+       HmumetParZvsZpt[i]->Write(); 
+     }
+
+     rootFile->Close();
+     
    }
 
-   Hjet1etanoC->Write();
-   Hjet1etaallCMet250->Write();
-   Hjet1etaallCMet500->Write();
-   Hjet2ptnoC->Write();
-   Hjet2ptallCMet250->Write();
-   Hjet2ptallCMet300->Write();
-   Hjet2ptallCMet400->Write();
-   Hjet2ptallCMet500->Write();
-   Hjet2etanoC->Write();
-   Hjet2etaallCMet250->Write();
-   Hjet2etaallCMet500->Write();
-   Hjet1jet2dphinoC->Write();
-   Hjet1jet2dphiallCMet250->Write();
-   Hjet1jet2dphiallCMet500->Write();
-   HnjetsnoC->Write();
-   HnjetsallCMet250->Write(); 
-   HnjetsallCMet500->Write();
-   HmumetnoC->Write();
-   HmumetallCMet250->Write(); 
-
-   for (Int_t i = 0; i < NVTXS; i++) {
-     HmumetOrtZvsNvtx[i]->Write(); 
-     HmumetParZvsNvtx[i]->Write(); 
-     HmumetX[i]->Write(); 
-     HmumetY[i]->Write();  
-   }
-
-   for (Int_t i = 0;  i < nBinsForResponse; i++) {
-     HZptBinned[i]->Write(); 
-     HmumetParZratio[i]->Write(); 
-     HmumetOrtZvsZpt[i]->Write(); 
-     HmumetParZvsZpt[i]->Write(); 
-   }
-
-   rootFile->Close();
+   delete rootFile;
 
    /*
 GetEffectiveEntries() returns ((Sum w)^2)/(Sum(w^2)) where w means weight and Sum is the sum over the arguments. This number is the number of events that would be needed by an unweighted histogram to have the same statistical power as the weighted one
@@ -977,7 +989,9 @@ To get the number of entries taking weights into account (that is to say, the bi
    Cjet1pt->SetLogy();
    Cjet1pt->SetGridy();
    Cjet1pt->SetGridx();
+   myAddOverflowInLastBin(Hjet1pt[0]);
    Hjet1pt[0]->Draw("HE");
+   //myDrawOverflow(Hjet1pt[0],"HE",0);
    Hjet1pt[0]->SetStats(kFALSE);
    LegCjet1pt->AddEntry(Hjet1pt[0],"no cuts","lf");
    Hjet1pt[0]->GetXaxis()->SetTitle("signaljet pt [GeV]");
@@ -990,7 +1004,9 @@ To get the number of entries taking weights into account (that is to say, the bi
      LegCjet1pt->AddEntry(Hjet1ptTriggerC,"trigger cuts","lf");
    }
    for ( Int_t i=1; i<=NCUTS; i++ ) {
+     myAddOverflowInLastBin(Hjet1pt[i]);
      Hjet1pt[i]->Draw("SAME HE");
+     //myDrawOverflow(Hjet1pt[i],"SAME HE",0);
      Hjet1pt[i]->SetStats(kFALSE);
      LegCjet1pt->AddEntry(Hjet1pt[i],Form("cut %i",i),"lf");
    }
@@ -1017,21 +1033,27 @@ To get the number of entries taking weights into account (that is to say, the bi
    Hjet1pt[0]->UseCurrentStyle();
    Hjet1pt[8]->UseCurrentStyle();
    Hjet1pt[11]->UseCurrentStyle();
+   myAddOverflowInLastBin(Hjet1pt[0]);
    Hjet1pt[0]->Draw("HE");
    Hjet1pt[0]->SetStats(kFALSE);
    Hjet1pt[0]->SetLineColor(1);
+   //myDrawOverflow(Hjet1pt[0],"HE",0);
    LegCjet1ptBis->AddEntry(Hjet1pt[0],"no cuts","l");
    Hjet1pt[0]->GetXaxis()->SetTitle("signaljet pt [GeV]");
    Hjet1pt[0]->GetYaxis()->SetTitle("events / 50 GeV");
    Hjet1pt[0]->GetYaxis()->SetTitleOffset(1.4);
    LegCjet1ptBis->AddEntry((TObject *)0,"all cuts and MET","");
+   myAddOverflowInLastBin(Hjet1pt[8]);
    Hjet1pt[8]->Draw("SAME HE");
    Hjet1pt[8]->SetStats(kFALSE);
    Hjet1pt[8]->SetLineColor(2);
+   //myDrawOverflow(Hjet1pt[8],"SAME HE",0);
    LegCjet1ptBis->AddEntry(Hjet1pt[8]," > 250 GeV ","l");
+   myAddOverflowInLastBin(Hjet1pt[11]);
    Hjet1pt[11]->Draw("SAME HE");
    Hjet1pt[11]->SetStats(kFALSE);
    Hjet1pt[11]->SetLineColor(4);
+   //myDrawOverflow(Hjet1pt[11],"SAME HE",0);
    LegCjet1ptBis->AddEntry(Hjet1pt[11]," > 500 GeV ","l");
    LegCjet1ptBis->Draw(); 
    LegCjet1ptBis->SetMargin(0.5); 
@@ -1489,9 +1511,9 @@ To get the number of entries taking weights into account (that is to say, the bi
    TFitResultPtr frpPar = GresolutionMumetParZvsNvtx->Fit(fitResoParVsNvtx,"I S Q B R","");
    frpPar->Print("V");
    Double_t sigmaCPar = TMath::Sqrt(GresolutionMumetParZvsNvtx->GetFunction("fitResoParVsNvtx")->GetParameter(0));
-   Double_t sigmaCErrPar = 0.5 * (TMath::Sqrt(GresolutionMumetParZvsNvtx->GetFunction("fitResoParVsNvtx")->GetParError(0))) / TMath::Sqrt(sigmaCPar);
+   Double_t sigmaCErrPar = 0.5 * (TMath::Sqrt(GresolutionMumetParZvsNvtx->GetFunction("fitResoParVsNvtx")->GetParError(0))) / sigmaCPar;
    Double_t sigmaPUPar = TMath::Sqrt(GresolutionMumetParZvsNvtx->GetFunction("fitResoParVsNvtx")->GetParameter(1));
-   Double_t sigmaPUErrPar = 0.5 * (TMath::Sqrt(GresolutionMumetParZvsNvtx->GetFunction("fitResoParVsNvtx")->GetParError(1))) / TMath::Sqrt(sigmaPUPar);
+   Double_t sigmaPUErrPar = 0.5 * (TMath::Sqrt(GresolutionMumetParZvsNvtx->GetFunction("fitResoParVsNvtx")->GetParError(1))) / sigmaPUPar;
    gStyle->SetOptFit(10100);
    CresolutionMumetParZvsNvtx->SaveAs(MY_PDF_PATH"resolutionMumetParZvsNvtx.pdf");
 
@@ -1517,9 +1539,9 @@ To get the number of entries taking weights into account (that is to say, the bi
    frpOrt->Print("V");
    //given the parameter [i], sigma = sqrt( [i] ) and the uncertainty is given by 0.5 * sigma([i]) / sqrt([i]) according to error propagation
    Double_t sigmaCOrt = TMath::Sqrt(GresolutionMumetOrtZvsNvtx->GetFunction("fitResoOrtVsNvtx")->GetParameter(0));
-   Double_t sigmaCErrOrt = 0.5 * (TMath::Sqrt(GresolutionMumetOrtZvsNvtx->GetFunction("fitResoOrtVsNvtx")->GetParError(0))) / TMath::Sqrt(sigmaCOrt);
+   Double_t sigmaCErrOrt = 0.5 * (TMath::Sqrt(GresolutionMumetOrtZvsNvtx->GetFunction("fitResoOrtVsNvtx")->GetParError(0))) / sigmaCOrt;
    Double_t sigmaPUOrt = TMath::Sqrt(GresolutionMumetOrtZvsNvtx->GetFunction("fitResoOrtVsNvtx")->GetParameter(1));
-   Double_t sigmaPUErrOrt = 0.5 * (TMath::Sqrt(GresolutionMumetOrtZvsNvtx->GetFunction("fitResoOrtVsNvtx")->GetParError(1))) / TMath::Sqrt(sigmaPUOrt);
+   Double_t sigmaPUErrOrt = 0.5 * (TMath::Sqrt(GresolutionMumetOrtZvsNvtx->GetFunction("fitResoOrtVsNvtx")->GetParError(1))) / sigmaPUOrt;
    gStyle->SetOptFit(10100);
    CresolutionMumetOrtZvsNvtx->SaveAs(MY_PDF_PATH"resolutionMumetOrtZvsNvtx.pdf");   
   
@@ -1650,6 +1672,15 @@ To get the number of entries taking weights into account (that is to say, the bi
 
    TCanvas *CresolutionMumetParZvsZpt = new TCanvas("CresolutionMumetParZvsZpt","resolution ||");
    TGraphErrors *GresolutionMumetParZvsZpt = new TGraphErrors(nBinsForResponse,meanZpt,resoMumetParZvsZpt,0,resoMumetParZvsZptErr);
+   TF1 *fitResoParVsZpt = new TF1("fitResoParVsZpt",&myResolutionFunctionNoB,150,800,2); 
+   fitResoParVsZpt->SetParNames("a","c");
+   fitResoParVsZpt->SetParameter(0,1.);
+   fitResoParVsZpt->SetParameter(1,0.05);
+   // fitResoParVsZpt->SetParLimits(0,0.,10000);  // must be positive
+   // fitResoParVsZpt->SetParLimits(1,0.,10000);  // must be positive
+   TFitResultPtr frpMumetParZvsZpt = GresolutionMumetParZvsZpt->Fit(fitResoParVsZpt,"I S Q B R","");
+   frpMumetParZvsZpt->Print("V");
+   //gStyle->SetOptFit(10000);
    GresolutionMumetParZvsZpt->SetTitle("resolution || from histogram's RMS");
    GresolutionMumetParZvsZpt->Draw("AP");
    GresolutionMumetParZvsZpt->SetMarkerStyle(7);  // 7 is a medium dot
@@ -1660,6 +1691,15 @@ To get the number of entries taking weights into account (that is to say, the bi
 
    TCanvas *CresolutionMumetOrtZvsZpt = new TCanvas("CresolutionMumetOrtZvsZpt","resolution _|_");
    TGraphErrors *GresolutionMumetOrtZvsZpt = new TGraphErrors(nBinsForResponse,meanZpt,resoMumetOrtZvsZpt,0,resoMumetOrtZvsZptErr);
+   // TF1 *fitResoOrtVsZpt = new TF1("fitResoOrtVsZpt",&myResolutionFunctionNoB,150,800,2); 
+   // fitResoOrtVsZpt->SetParNames("a","c");
+   // fitResoOrtVsZpt->SetParameter(0,1.);
+   // fitResoOrtVsZpt->SetParameter(1,0.05);
+   // fitResoOrtVsZpt->SetParLimits(0,0.,10000);  // must be positive
+   // fitResoOrtVsZpt->SetParLimits(1,0.,10000);  // must be positive
+   // TFitResultPtr frpMumetOrtZvsZpt = GresolutionMumetOrtZvsZpt->Fit(fitResoOrtVsZpt,"I S Q B R","");
+   // frpMumetOrtZvsZpt->Print("V");
+   //gStyle->SetOptFit(10000);
    GresolutionMumetOrtZvsZpt->SetTitle("resolution _|_ from histogram's RMS");
    GresolutionMumetOrtZvsZpt->Draw("AP");
    GresolutionMumetOrtZvsZpt->SetMarkerStyle(7);
@@ -1671,6 +1711,23 @@ To get the number of entries taking weights into account (that is to say, the bi
    /****************************************************/
    // END OF CANVASES
    /****************************************************/ 
+
+   // saving all objects in file
+   const char *allRootFileName = "allObjects.root";
+   cout<<"Saving all objects in file \""<<allRootFileName<<"\" ..."<<endl;
+   TFile *allRootFile = new TFile(allRootFileName,"RECREATE");
+
+   if (!allRootFile->IsOpen()) {
+
+     cout<<"Error: file \""<<allRootFileName<<"\" was not opened."<<endl;
+
+   } else {
+     allRootFile->Write();
+     allRootFile->Close();
+     
+   }
+
+   delete allRootFile;
 
 }      
 
